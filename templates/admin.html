@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pôpaix Bot — Admin</title>
+<style>
+  :root { --green:#0b7a3b; --dark:#0f2a1c; --gold:#c9a13b; --bg:#f5f7f5; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:#1c2b24; }
+  header { background:var(--dark); color:#fff; padding:18px 24px; display:flex; justify-content:space-between; align-items:center; }
+  header h1 { font-size:20px; } header span { color:var(--gold); }
+  .badge { background:var(--green); padding:4px 10px; border-radius:20px; font-size:13px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; padding:20px 24px; }
+  .card { background:#fff; border-radius:12px; padding:18px; box-shadow:0 2px 8px rgba(0,0,0,.06); border-left:4px solid var(--green); }
+  .card .num { font-size:30px; font-weight:700; }
+  .card .lbl { font-size:13px; color:#667; margin-top:4px; }
+  .table-wrap { padding:0 24px 30px; }
+  table { width:100%; border-collapse:collapse; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+  th, td { padding:12px 14px; text-align:left; border-bottom:1px solid #eef1ee; font-size:14px; }
+  th { background:var(--dark); color:#fff; font-weight:600; }
+  tr:hover { background:#fafff9; }
+  .status { padding:3px 10px; border-radius:16px; font-size:12px; font-weight:600; }
+  .pending { background:#fff4d6; color:#8a6500; }
+  .confirmed { background:#dcf5ff; color:#006687; }
+  .paid { background:#d7f7e0; color:#0b7a3b; }
+  .cancelled { background:#ffe7e5; color:#a1332c; }
+  select { padding:5px 8px; border-radius:6px; border:1px solid #ccd; }
+  .empty { padding:40px; text-align:center; color:#899; }
+  .channel { font-size:12px; padding:2px 8px; border-radius:10px; background:#eceffa; }
+  footer { text-align:center; padding:18px; color:#899; font-size:12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🌴 Hôtel <span>Pôpaix</span> — Console Admin</h1>
+  <span class="badge">Bot WhatsApp + Telegram</span>
+</header>
+
+<section class="cards" id="cards"></section>
+
+<div class="table-wrap">
+  <h2 style="margin:0 0 12px;">Pré-réservations</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>Client</th><th>Canal</th><th>Arrivée</th><th>Départ</th>
+        <th>Chambre</th><th>Tél</th><th>Statut</th><th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="empty" id="empty">Chargement…</div>
+</div>
+
+<footer>POPAIX BOT · Données stockées localement / Supabase · Réouverture 15 déc 2026</footer>
+
+<script>
+const STATUS = {
+  pending: 'En attente', confirmed: 'Confirmée', paid: 'Payée', cancelled: 'Annulée'
+};
+
+function renderCards(stats) {
+  const cards = [
+    ['Conversations', stats.conversations ?? 0],
+    ['WhatsApp', stats.whatsapp_conversations ?? 0],
+    ['Telegram', stats.telegram_conversations ?? 0],
+    ['Pré-réservations', stats.prebookings ?? 0],
+    ['Confirmées', stats.confirmed ?? 0],
+    ['Payées', stats.paid ?? 0],
+  ];
+  document.getElementById('cards').innerHTML = cards.map(([l, n]) => `
+    <div class="card"><div class="num">${n}</div><div class="lbl">${l}</div></div>
+  `).join('');
+}
+
+function formatDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('fr-FR');
+}
+
+function renderPrebookings(rows) {
+  const tbody = document.getElementById('tbody');
+  const empty = document.getElementById('empty');
+  if (!rows.length) {
+    empty.textContent = 'Aucune pré-réservation pour le moment.';
+    return;
+  }
+  empty.style.display = 'none';
+  tbody.innerHTML = rows.map(b => `
+    <tr>
+      <td>${b.id}</td>
+      <td><b>${b.name || '—'}</b></td>
+      <td><span class="channel">${b.channel}</span></td>
+      <td>${b.check_in || '—'}</td>
+      <td>${b.check_out || '—'}</td>
+      <td>${b.room_type || '—'}</td>
+      <td>${b.phone || '—'}</td>
+      <td><span class="status ${b.status}">${STATUS[b.status] || b.status}</span></td>
+      <td>
+        <select onchange="setStatus(${b.id}, this.value)">
+          ${Object.entries(STATUS).map(([k, v]) =>
+            `<option value="${k}" ${k === b.status ? 'selected' : ''}>${v}</option>`).join('')}
+        </select>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function setStatus(id, status) {
+  await fetch(`/api/prebookings/${id}/status`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({status})
+  });
+  refresh();
+}
+
+async function refresh() {
+  try {
+    const [stats, prebooks] = await Promise.all([
+      fetch('/api/stats').then(r => r.json()),
+      fetch('/api/prebookings').then(r => r.json()),
+    ]);
+    renderCards(stats);
+    renderPrebookings(prebooks);
+  } catch (e) {
+    document.getElementById('empty').textContent = 'Erreur de chargement ' + e;
+  }
+}
+
+refresh();
+setInterval(refresh, 30000);
+</script>
+</body>
+</html>
