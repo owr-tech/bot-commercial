@@ -7,3 +7,4 @@ anthropic==0.42.0
 openai==1.59.6
 sqlalchemy==2.0.36
 python-telegram-bot==21.10
+psycopg2-binary==2.9.10

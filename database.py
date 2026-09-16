@@ -18,9 +18,15 @@ Base = declarative_base()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./popaix.db")
 
+# Render fournit postgresql://... (sans driver) → ajouter psycopg2
+if DATABASE_URL.startswith("postgresql://") and "+psycopg2" not in DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
+
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {},
+    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {
+        "sslmode": "require"
+    },
 )
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
