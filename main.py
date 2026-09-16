@@ -1,9 +1,12 @@
 import os
 import threading
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
+
+load_dotenv()
 
 USER_LOCKS: dict[str, threading.Lock] = {}
 USER_LOCKS_GUARD = threading.Lock()

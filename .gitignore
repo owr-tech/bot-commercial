@@ -4,3 +4,5 @@ venv/
 *.db
 __pycache__/
 *.pyc
+.tiket_cache.json
+PAT-GITHUB

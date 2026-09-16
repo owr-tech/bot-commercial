@@ -1,8 +1,6 @@
 import json
 import os
 
-import requests
-
 from knowledge import POPAIX_KNOWLEDGE
 
 SYSTEM_PROMPT = None
@@ -13,73 +11,91 @@ def load_system_prompt() -> str:
     if SYSTEM_PROMPT is not None:
         return SYSTEM_PROMPT
     try:
-        with open("system_prompt.txt", "r", encoding="utf-8") as f:
+        with open("system_prompt.md", "r", encoding="utf-8") as f:
             SYSTEM_PROMPT = f.read()
     except FileNotFoundError:
-        SYSTEM_PROMPT = (
-            "Tu es PopaixBot, assistant de l'Hôtel Pôpaix. "
-            "Réponds en français ivoirien, court et chaleureux."
-        )
+        try:
+            with open("system_prompt.txt", "r", encoding="utf-8") as f:
+                SYSTEM_PROMPT = f.read()
+        except FileNotFoundError:
+            SYSTEM_PROMPT = (
+                "Tu es PopaixBot, assistant de l'Hôtel Pôpaix. "
+                "Réponds en français ivoirien, court et chaleureux."
+            )
     return SYSTEM_PROMPT
 
 
-def build_context(history: list[tuple[str, str]] | None = None) -> str:
-    lines = [f"KNOWLEDGE: {json.dumps(POPAIX_KNOWLEDGE, ensure_ascii=False)}"]
-    if history:
-        lines.append("\nHISTORIQUE DE LA CONVERSATION (récents d'abord):")
-        for user_msg, bot_reply in reversed(history):
-            lines.append(f"USER: {user_msg}")
-            lines.append(f"BOT: {bot_reply}")
-    return "\n".join(lines)
+def get_knowledge() -> dict:
+    """Connaissance POPAIX fusionnée avec la source tiket.com (cache)."""
+    knowledge = dict(POPAIX_KNOWLEDGE)
+    try:
+        from sources import get_tiket_data
+
+        knowledge.update({"tiket": get_tiket_data()})
+    except Exception as e:
+        print(f"[TIKET] inaccessible: {e}")
+    return knowledge
 
 
-def ask_mistral(context: str, history: list[tuple[str, str]]) -> str:
-    from mistralai import Mistral
+def build_system(user_message: str) -> str:
+    """Prompt système = instructions + faits officiels, la question reste un message séparé."""
+    knowledge = get_knowledge()
+    facts = json.dumps(knowledge, ensure_ascii=False)
+    return (
+        load_system_prompt()
+        + "\n\n## FAITS OFFICIELS STRUCTURÉS (KNOWLEDGE)\n"
+        + facts
+        + f"\n\nQuestion du client à laquelle tu dois répondre précisément : {user_message}"
+    )
 
-    client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
-    messages = [{"role": "system", "content": load_system_prompt()}]
-    for user_msg, bot_reply in reversed(history or []):
+
+def build_history(user_message: str, history: list[tuple[str, str]]) -> list[dict]:
+    messages = []
+    for user_msg, bot_reply in (history or [])[-6:]:
         messages.append({"role": "user", "content": user_msg})
         messages.append({"role": "assistant", "content": bot_reply})
-    messages.append({"role": "user", "content": context})
+    messages.append({"role": "user", "content": user_message})
+    return messages
+
+
+def ask_mistral(user_message: str, history: list[tuple[str, str]]) -> str:
+    from mistralai.client import sdk
+
+    client = sdk.Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
     resp = client.chat.complete(
         model=os.getenv("MISTRAL_MODEL", "mistral-small-latest"),
-        messages=messages,
+        messages=[
+            {"role": "system", "content": build_system(user_message)},
+            *build_history(user_message, history),
+        ],
         max_tokens=400,
     )
     return resp.choices[0].message.content
 
 
-def ask_claude(context: str, history: list[tuple[str, str]]) -> str:
+def ask_claude(user_message: str, history: list[tuple[str, str]]) -> str:
     import anthropic
 
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-    messages = []
-    for user_msg, bot_reply in reversed(history or []):
-        messages.append({"role": "user", "content": user_msg})
-        messages.append({"role": "assistant", "content": bot_reply})
-    messages.append({"role": "user", "content": context})
     msg = client.messages.create(
         model=os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514"),
         max_tokens=500,
-        system=load_system_prompt(),
-        messages=messages,
+        system=build_system(user_message),
+        messages=build_history(user_message, history),
     )
     return msg.content[0].text
 
 
-def ask_openai(context: str, history: list[tuple[str, str]]) -> str:
+def ask_openai(user_message: str, history: list[tuple[str, str]]) -> str:
     from openai import OpenAI
 
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    messages = [{"role": "system", "content": load_system_prompt()}]
-    for user_msg, bot_reply in reversed(history or []):
-        messages.append({"role": "user", "content": user_msg})
-        messages.append({"role": "assistant", "content": bot_reply})
-    messages.append({"role": "user", "content": context})
     resp = client.chat.completions.create(
         model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
-        messages=messages,
+        messages=[
+            {"role": "system", "content": build_system(user_message)},
+            *build_history(user_message, history),
+        ],
         max_tokens=400,
     )
     return resp.choices[0].message.content
@@ -126,6 +142,20 @@ def fallback_reply(user_message: str) -> str:
             "Restaurant ANWUKWA 🍕 : Sorbets 2.000 F, Margherita 4.000 F + boisson, "
             "Royale 5.000 F + boisson. Cuisine africaine, caribéenne et française halal."
         )
+    if any(w in msg for w in ["check-in", "check in", "arrivée", "arrive", "heure d'arrivée"]):
+        return "Le check-in se fait à 10:00 et le check-out à 13:00. 😊"
+    if any(w in msg for w in ["animal", "chien", "chat", "pet"]):
+        return "Oui, les animaux sont acceptés ! 🐾"
+    if any(w in msg for w in ["parking", "garer", "voiture"]):
+        return "Oui, nous avons un parking gratuit. 🚗"
+    if any(w in msg for w in ["service", "equipement", "équipement", "facility", "salle de réunion",
+                              "piscine", "jaquette", "spa", "bbq", "pêche", "peche", "casino",
+                              "conciergerie", "menuiserie"]):
+        return (
+            "Nos services 🌴 : WiFi, parking, restaurant ANWUKWA, piscine, rooftop, bar, jardin, "
+            "room service 24/24, réunion, conciergerie, BBQ, pêche, jeux enfants, animaux acceptés. "
+            "Dites 'pré-réserver' pour lancer la réservation."
+        )
     return (
         "Bienvenue à l'Hôtel Pôpaix 🌴 23 chambres face plage à Fresco. "
         "Réouverture le 15 décembre 2026 avec piscine ! Les pré-réservations sont ouvertes. "
@@ -136,15 +166,14 @@ def fallback_reply(user_message: str) -> str:
 def ask_ai(user_message: str, history: list[tuple[str, str]] | None = None) -> str:
     provider = os.getenv("AI_PROVIDER", "mistral").lower()
     history = history or []
-    context = build_context(history)
 
     try:
         if provider == "mistral":
-            return ask_mistral(context, history)
+            return ask_mistral(user_message, history)
         elif provider == "claude":
-            return ask_claude(context, history)
+            return ask_claude(user_message, history)
         elif provider == "openai":
-            return ask_openai(context, history)
+            return ask_openai(user_message, history)
         else:
             return fallback_reply(user_message)
     except Exception as e:

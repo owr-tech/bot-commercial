@@ -2,8 +2,11 @@ import asyncio
 import os
 import threading
 
+from dotenv import load_dotenv
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+
+load_dotenv()
 
 from ai_provider import ask_ai
 from database import get_recent_history, save_conversation
@@ -87,7 +90,15 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def build_application() -> Application:
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
+    app = Application.builder().token(TELEGRAM_TOKEN)
+    app = (
+        app
+        .connect_timeout(30)
+        .read_timeout(60)
+        .write_timeout(60)
+        .pool_timeout(30)
+        .build()
+    )
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("cancel", cancel))

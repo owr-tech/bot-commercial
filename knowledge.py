@@ -30,6 +30,37 @@ POPAIX_KNOWLEDGE = {
         "Plus d'infos disponibles sur WhatsApp et Telegram. "
         "Posez vos questions : tarifs, chambres, réouverture."
     ),
+    "tiket": {
+        "source": "https://www.tiket.com/en-us/hotel/cote-divoire/hotel-popaix-707001721942024071",
+        "location": "Gbôkle, Fresco (Bas-Sassandra), Côte d'Ivoire — front lagunaire",
+        "check_in": "10:00",
+        "check_out": "13:00",
+        "rooms": "Chambres climatisées avec douche",
+        "amenities": [
+            "WiFi gratuit",
+            "Parking",
+            "Climatisation",
+            "Réception 24h/24",
+            "Restaurant",
+            "Café / Coffee shop",
+            "Bar / Lounge / Pub",
+            "Jardin",
+            "Plage privée",
+            "Terrasse / Balcon",
+            "Hiking / Randonnée",
+            "Salle de jeux (arcade)",
+            "Pêche",
+            "Pataugeoire / Aire de jeux enfants",
+            "BBQ",
+            "Lave-linge",
+            "Salle de réunion",
+            "Conciergerie",
+            "Assistance visites et billets",
+            "Casino",
+            "Animaux acceptés",
+            "Non-fumeur",
+        ],
+    },
 }
 
-SYSTEM_PROMPT_PATH = "system_prompt.txt"
+SYSTEM_PROMPT_PATH = "system_prompt.md"
