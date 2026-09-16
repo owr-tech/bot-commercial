@@ -107,11 +107,12 @@ def fallback_reply(user_message: str) -> str:
         return (
             "Nos chambres : 🛏️ T1 = 25.000 F · T2 = 30.000 F · T3 = 35.000 F · "
             "T4 = 40.000 F par nuit. 🍕 Sorbets 2.000 F, Pizza Margherita 4.000 F + boisson. "
-            "Réouverture le 15 décembre 2026 🌴"
+            # "Réouverture le 15 décembre 2026 🌴"
         )
     if any(w in msg for w in ["réouverture", "ouvre", "reouverture", "quand", "date"]):
         return (
-            "On rouvre le 15 décembre 2026 à 16h ! 🎉 Nouveauté : une belle piscine. "
+            # "On rouvre le 15 décembre 2026 à 16h ! 🎉 "
+            "Nouveauté : une belle piscine. "
             "Les pré-réservations sont OUVERTES. Dites-moi 'pré-réserver' pour réserver votre chambre."
         )
     if any(w in msg for w in ["chambre", "lit", "suite"]):
@@ -119,15 +120,21 @@ def fallback_reply(user_message: str) -> str:
             "23 chambres face plage 🌊 : T1 (25.000 F), T2 (30.000 F), T3 (35.000 F), "
             "T4 (40.000 F). Toutes avec clim, wifi gratuit. Dites 'pré-réserver' pour commencer !"
         )
-    if any(w in msg for w in ["pré-réserver", "prereserver", "reserver", "réserver", "reserver"]):
+    if any(
+        w in msg
+        for w in ["pré-réserver", "prereserver", "reserver", "réserver", "reserver"]
+    ):
         return (
             "Avec plaisir ! 🎉 Pour votre pré-réservation, donnez-moi :\n"
             "1️⃣ Votre nom complet\n"
             "2️⃣ Les dates (arrivée et départ)\n"
             "3️⃣ Le type de chambre : T1 (25.000F), T2 (30.000F), T3 (35.000F) ou T4 (40.000F)\n\n"
-            "Ex : 'Je suis Jean Kouassi, du 20 au 25 décembre, chambre T2'"
+            "Ex : 'Je suis Jean Kouassi, du 20 au 25 décembre 2026, chambre T2'"
         )
-    if any(w in msg for w in ["contact", "adresse", "téléphone", "telephone", "whatsapp", "numéro"]):
+    if any(
+        w in msg
+        for w in ["contact", "adresse", "téléphone", "telephone", "whatsapp", "numéro"]
+    ):
         return (
             "Vous pouvez nous joindre au 01 42 30 84 84 ou sur @hotelpopaix 📞 "
             "Nous sommes face plage/lagune Koyiri à Fresco, Côte d'Ivoire."
@@ -142,23 +149,42 @@ def fallback_reply(user_message: str) -> str:
             "Restaurant ANWUKWA 🍕 : Sorbets 2.000 F, Margherita 4.000 F + boisson, "
             "Royale 5.000 F + boisson. Cuisine africaine, caribéenne et française halal."
         )
-    if any(w in msg for w in ["check-in", "check in", "arrivée", "arrive", "heure d'arrivée"]):
+    if any(
+        w in msg
+        for w in ["check-in", "check in", "arrivée", "arrive", "heure d'arrivée"]
+    ):
         return "Le check-in se fait à 10:00 et le check-out à 13:00. 😊"
     if any(w in msg for w in ["animal", "chien", "chat", "pet"]):
         return "Oui, les animaux sont acceptés ! 🐾"
     if any(w in msg for w in ["parking", "garer", "voiture"]):
         return "Oui, nous avons un parking gratuit. 🚗"
-    if any(w in msg for w in ["service", "equipement", "équipement", "facility", "salle de réunion",
-                              "piscine", "jaquette", "spa", "bbq", "pêche", "peche", "casino",
-                              "conciergerie", "menuiserie"]):
+    if any(
+        w in msg
+        for w in [
+            "service",
+            "equipement",
+            "équipement",
+            "facility",
+            "salle de réunion",
+            "piscine",
+            "jaquette",
+            "spa",
+            "bbq",
+            "pêche",
+            "peche",
+            "casino",
+            "conciergerie",
+            "menuiserie",
+        ]
+    ):
         return (
             "Nos services 🌴 : WiFi, parking, restaurant ANWUKWA, piscine, rooftop, bar, jardin, "
             "room service 24/24, réunion, conciergerie, BBQ, pêche, jeux enfants, animaux acceptés. "
             "Dites 'pré-réserver' pour lancer la réservation."
         )
     return (
-        "Bienvenue à l'Hôtel Pôpaix 🌴 23 chambres face plage à Fresco. "
-        "Réouverture le 15 décembre 2026 avec piscine ! Les pré-réservations sont ouvertes. "
+        "Bienvenue à l'Hôtel Pôpaix 🌴  chambres face plage à Fresco. "
+        "Notre nouvelle piscine disponible  piscine ! Les pré-réservations sont ouvertes. "
         "Demandez-moi les prix, les chambres ou écrivez 'pré-réserver'."
     )
 

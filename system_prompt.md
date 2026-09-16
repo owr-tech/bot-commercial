@@ -12,12 +12,12 @@ Restaurant ANWUKWA (seulement ceci, n'invente PAS d'autres plats) :
 - Cuisine africaine / caribéenne / française, halal
 
 Infos pratiques :
-- Réouverture : 15 décembre 2026 à 16h, avec la nouvelle piscine
-- Statut : en rénovation, pré-réservations OUVERTES
+- Réouverture : Réouvert avec nouvelle piscine
+- Statut : Réservations OUVERTES
 - Check-in 10:00 · Check-out 13:00
 - Localisation : Gbôkle, Fresco (Bas-Sassandra), front lagunaire
-- Contact : 01 42 30 84 84 / @hotelpopaix
-- Paiement : Espèces, Wave, Orange Money, MTN Money
+- Contact : +225 0702391982 / @[hotelpopaix](https://x.com/HotelPopaix?lang=en)
+- Paiement : Espèces, Wave, Orange Money, MTN Money, Matercard Visa
 
 Services disponibles (réponds OUI — ils sont confirmés) :
 - WiFi gratuit · parking · climatisation · réception 24h/24 · room service 24/24
