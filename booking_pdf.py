@@ -80,7 +80,7 @@ def _is_paid(book) -> bool:
 def _status_label(book) -> str:
     status = (book.status or "").lower()
     if _is_paid(book):
-        return "PAID · PAYÉ"
+        return "PAIEMENT EFFECTUÉ"
     labels = {
         "confirmed": "CONFIRMED",
         "awaiting_payment": "EN ATTENTE DE PAIEMENT",

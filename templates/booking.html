@@ -45,6 +45,14 @@
     margin-bottom: 22px;
   }
   .paid .dot { width: 9px; height: 9px; border-radius: 50%; background: #6fd3a0; }
+  .paid.pending { background: var(--muted); }
+  .paid.pending .dot { background: #f0c04a; }
+  .notice {
+    margin: 26px 0; padding: 22px; text-align: center;
+    background: var(--card); border: 1px dashed var(--gold);
+    color: var(--muted); font-size: 14px;
+  }
+  .btn.disabled { opacity: .55; cursor: not-allowed; border-style: dashed; }
   h1 { font-family: 'Fraunces', serif; font-weight: 500; font-size: 30px; color: var(--ink); margin-bottom: 6px; }
   .sub { color: var(--muted); margin-bottom: 26px; }
   .card {
@@ -86,12 +94,12 @@
 <header>
   <div class="band">
     <div class="wordmark">Hôtel Pôpaix<small>GBÔKLE · FRESCO</small></div>
-    <div class="paid"><span class="dot"></span> Paiement confirmé</div>
+    <div class="paid {{status_class}}"><span class="dot"></span> {{status_badge}}</div>
   </div>
 </header>
 <main>
   <h1>Réservation #{{booking_id}}</h1>
-  <p class="sub">Merci {{name}} — votre séjour est confirmé. Présentez le QR ci-dessous à la réception.</p>
+  <p class="sub">{{sub_text}}</p>
 
   <div class="card">
     <div class="room">
@@ -106,17 +114,14 @@
       <div class="row"><span class="k">Arrivée</span><span class="v">{{check_in}} · dès 10:00</span></div>
       <div class="row"><span class="k">Départ</span><span class="v">{{check_out}} · avant 13:00</span></div>
       <div class="row"><span class="k">Nuits</span><span class="v">{{nights}}</span></div>
-      <div class="row total"><span class="k">Total réglé</span><span class="v">{{total}} FCFA</span></div>
+      <div class="row total"><span class="k">{{total_label}}</span><span class="v">{{total}} FCFA</span></div>
     </div>
   </div>
 
-  <div class="qrwrap">
-    <img src="{{qr_url}}" alt="QR réservation">
-    <p>Scannez ce code à l'arrivée pour valider votre séjour.</p>
-  </div>
+  {{qr_section}}
 
   <div class="actions">
-    <a class="btn primary" href="{{pdf_url}}">Télécharger le voucher PDF</a>
+    {{pdf_action}}
     <a class="btn ghost" href="{{wa_link}}">Reprendre sur WhatsApp</a>
     <a class="btn ghost" href="{{tg_link}}">Reprendre sur Telegram</a>
   </div>

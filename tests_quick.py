@@ -198,13 +198,60 @@ def test_voucher_status():
             self.amount_paid = paid
             self.paid_at = paid_at
 
-    assert _status_label(B("paid", 150000, 150000)) == "PAID · PAYÉ"
+    assert _status_label(B("paid", 150000, 150000)) == "PAIEMENT EFFECTUÉ"
     # Cas réel : objet chargé avant le marquage « paid » → statut périmé mais montant réglé
-    assert _status_label(B("awaiting_payment", 150000, 150000)) == "PAID · PAYÉ"
+    assert _status_label(B("awaiting_payment", 150000, 150000)) == "PAIEMENT EFFECTUÉ"
     assert _status_label(B("awaiting_payment", 150000, 0)) == "EN ATTENTE DE PAIEMENT"
     assert _status_label(B("pending", 150000, 0)) == "RÉSERVÉ · BOOKED"
     assert _is_paid(B("pending", 150000, 150000)) is True
     assert _is_paid(B("awaiting_payment", 150000, 0)) is False
+
+
+def test_voucher_restriction():
+    """QR + PDF interdits (403) tant que le paiement n'est pas confirmé."""
+    from fastapi import HTTPException
+
+    import main
+
+    class B:
+        id = 999
+        name = "Test Client"
+        check_in = "20/12"
+        check_out = "25/12"
+        room_type = "T2"
+        created_at = None
+        channel = "telegram"
+        user_id = "u-test"
+
+        def __init__(self, status, due, paid, paid_at=None):
+            self.status = status
+            self.amount_due = due
+            self.amount_paid = paid
+            self.paid_at = paid_at
+
+    orig = main.get_prebooking
+    try:
+        main.get_prebooking = lambda _id: B("awaiting_payment", 150000, 0)
+        for fn in (main.booking_pdf_route, main.booking_qr_route):
+            try:
+                fn(999)
+                raise AssertionError(f"{fn.__name__} aurait dû renvoyer 403")
+            except HTTPException as e:
+                assert e.status_code == 403, f"{fn.__name__} → {e.status_code}"
+
+        main.get_prebooking = lambda _id: B("paid", 150000, 150000)
+        assert main.booking_pdf_route(999).media_type == "application/pdf"
+        assert main.booking_qr_route(999).media_type == "image/png"
+    finally:
+        main.get_prebooking = orig
+
+    ctx = main._booking_context(B("awaiting_payment", 150000, 0))
+    assert ctx["paid"] is False
+    assert "disponibles" in ctx["qr_section"] and "qrwrap" not in ctx["qr_section"]
+    assert "attente" in ctx["pdf_action"].lower()
+    ctx = main._booking_context(B("paid", 150000, 150000))
+    assert ctx["paid"] is True
+    assert "qrwrap" in ctx["qr_section"] and "Télécharger" in ctx["pdf_action"]
 
 
 def test_rooms_cards():
@@ -249,6 +296,7 @@ if __name__ == "__main__":
     test_whatsapp_flow()
     test_presentation()
     test_voucher_status()
+    test_voucher_restriction()
     test_rooms_cards()
     test_voucher_pdf()
     test_flow_api_booking()

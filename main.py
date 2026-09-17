@@ -44,14 +44,18 @@ app = FastAPI(title="Hôtel Pôpaix Bot")
 
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "popaix2026")
 WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
-WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID") or os.getenv("PHONE_ID") or ""
+WHATSAPP_PHONE_ID = (
+    os.getenv("WHATSAPP_PHONE_ID") or os.getenv("PHONE_NUMBER_ID") or os.getenv("PHONE_ID") or ""
+)
 WABA_ID = os.getenv("WABA_ID", "")
 GRAPH_URL = f"https://graph.facebook.com/v19.0/{WHATSAPP_PHONE_ID}/messages"
 GRAPH_MEDIA_URL = f"https://graph.facebook.com/v19.0/{WHATSAPP_PHONE_ID}/media"
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
 
-WHATSAPP_REDIRECT_NUMBER = os.getenv("WHATSAPP_REDIRECT_NUMBER", "2250702391982")
+WHATSAPP_REDIRECT_NUMBER = "".join(
+    c for c in os.getenv("WHATSAPP_REDIRECT_NUMBER", "2250702391982") if c.isdigit()
+) or "2250702391982"
 TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "popaixbot")
 
 # Flow WhatsApp (calendrier + chambres) — résolu au démarrage
@@ -429,12 +433,32 @@ async def paydunya_webhook(request: Request):
         conf = {}
 
     status = (conf.get("status") or data.get("status") or "").lower()
+    response_code = str(conf.get("response_code") or data.get("response_code") or "").strip()
     custom_data = conf.get("custom_data") or {}
-    total_amount = int(conf.get("invoice", {}).get("total_amount") or data.get("total_amount") or 0)
+    try:
+        total_amount = int(
+            float(conf.get("invoice", {}).get("total_amount") or data.get("total_amount") or 0)
+        )
+    except (TypeError, ValueError):
+        total_amount = 0
+
+    # 2bis) Le statut seul ne suffit pas : PayDunya doit renvoyer response_code "00"
+    if response_code and response_code != "00":
+        print(
+            f"[PAYDUNYA][WARN] response_code={response_code} "
+            f"(token={invoice_token}) — non finalisé."
+        )
+        return {"status": "ok", "transaction_status": status or "unknown"}
 
     if status != "completed":
         print(f"[PAYDUNYA] Webhook statut '{status}' (token={invoice_token}) — non finalisé.")
         return {"status": "ok", "transaction_status": status}
+
+    if not response_code:
+        print(
+            f"[PAYDUNYA][INFO] response_code absent (token={invoice_token}) "
+            f"— statut '{status}' retenu."
+        )
 
     prebooking_id = custom_data.get("prebooking_id")
     if not prebooking_id and data.get("custom_data"):
@@ -464,11 +488,31 @@ async def paydunya_webhook(request: Request):
         print(f"[PAYDUNYA][WARN] Aucune pré-réservation pour token={invoice_token}")
         return {"status": "ok", "transaction_status": "completed", "warn": "booking_not_found"}
 
-    # 4) Marquage payé + notification client
+    # 4) Idempotence : un callback déjà traité ne renvoie pas le voucher une 2e fois
+    from booking_pdf import _is_paid
+
+    if _is_paid(book):
+        print(f"[PAYDUNYA] Réservation #{book.id} déjà payée — callback ignoré.")
+        return {
+            "status": "ok",
+            "transaction_status": "completed",
+            "prebooking_id": book.id,
+            "already_paid": True,
+        }
+
+    # 4bis) Garde-fou montant : paiement partiel signalé (mais traité si PayDunya "completed")
+    amount_due = book.amount_due or 0
+    if total_amount and amount_due and total_amount < amount_due:
+        print(
+            f"[PAYDUNYA][WARN] Montant reçu {total_amount} < dû {amount_due} "
+            f"pour #{book.id} — à vérifier."
+        )
+
+    # 5) Marquage payé + notification client
     mark_prebooking_paid(book.id, total_amount or book.amount_due or 0)
     update_prebooking_status(book.id, "paid")
 
-    # 4bis) Libère la session : le client n'est plus bloqué en attente de paiement
+    # 5bis) Libère la session : le client n'est plus bloqué en attente de paiement
     clear_session_state(book.channel, book.user_id)
 
     recap = (
@@ -486,7 +530,7 @@ async def paydunya_webhook(request: Request):
     else:
         print(f"[PAYDUNYA] Paiement #{book.id} confirmé (canal {book.channel}) :\n{recap}")
 
-    # 5) Envoi du voucher PDF + QR (code à présenter à la réception)
+    # 6) Message de succès déjà envoyé ci-dessus → puis voucher PDF + QR
     notify_voucher(book)
 
     print(f"[PAYDUNYA] ✅ Réservation #{book.id} payée et confirmée.")
@@ -555,15 +599,54 @@ def _prepare_flow():
 def _booking_context(book) -> dict:
     from urllib.parse import quote
 
+    from booking_pdf import _is_paid
     from flows import compute_nights
 
     nights = compute_nights(book.check_in, book.check_out) or 1
     total = book.amount_paid or book.amount_due or 0
     room = ROOM_INFO.get((book.room_type or "").upper(), {})
+    name = book.name or "Client"
     wa_text = f"Bonjour, je viens de payer ma réservation PO PAIX HOTEL ET EXPERIENCES #{book.id}"
+    booking_url = f"{PUBLIC_BASE_URL}/booking/{book.id}"
+    pdf_url = f"{PUBLIC_BASE_URL}/booking/{book.id}/pdf"
+    qr_url = f"{PUBLIC_BASE_URL}/booking/{book.id}/qr.png"
+
+    # Restriction : QR + voucher PDF uniquement une fois le paiement confirmé
+    paid = _is_paid(book)
+    if paid:
+        status_class = ""
+        status_badge = "Paiement confirmé"
+        sub_text = (
+            f"Merci {name} — votre séjour est confirmé. "
+            "Présentez le QR ci-dessous à la réception."
+        )
+        total_label = "Total réglé"
+        qr_section = (
+            '<div class="qrwrap">'
+            f'<img src="{qr_url}" alt="QR réservation">'
+            "<p>Scannez ce code à l'arrivée pour valider votre séjour.</p>"
+            "</div>"
+        )
+        pdf_action = f'<a class="btn primary" href="{pdf_url}">Télécharger le voucher PDF</a>'
+    else:
+        status_class = "pending"
+        status_badge = "En attente de paiement"
+        sub_text = (
+            f"Bonjour {name} — votre réservation est enregistrée mais pas encore réglée. "
+            "Le QR code et le voucher seront disponibles dès confirmation du paiement."
+        )
+        total_label = "Total à payer"
+        qr_section = (
+            '<div class="notice">🔒 QR code et voucher disponibles '
+            "après confirmation du paiement.</div>"
+        )
+        pdf_action = (
+            '<span class="btn ghost disabled">Voucher PDF — en attente de paiement</span>'
+        )
+
     return {
         "booking_id": str(book.id),
-        "name": book.name or "Client",
+        "name": name,
         "check_in": book.check_in or "-",
         "check_out": book.check_out or "-",
         "room_title": room.get("title", book.room_type or "-"),
@@ -572,9 +655,16 @@ def _booking_context(book) -> dict:
         "nights": str(nights),
         "total": f"{total:,}".replace(",", "."),
         "status": book.status or "-",
-        "booking_url": f"{PUBLIC_BASE_URL}/booking/{book.id}",
-        "pdf_url": f"{PUBLIC_BASE_URL}/booking/{book.id}/pdf",
-        "qr_url": f"{PUBLIC_BASE_URL}/booking/{book.id}/qr.png",
+        "paid": paid,
+        "status_class": status_class,
+        "status_badge": status_badge,
+        "sub_text": sub_text,
+        "total_label": total_label,
+        "qr_section": qr_section,
+        "pdf_action": pdf_action,
+        "booking_url": booking_url,
+        "pdf_url": pdf_url,
+        "qr_url": qr_url,
         "wa_link": f"https://wa.me/{WHATSAPP_REDIRECT_NUMBER}?text={quote(wa_text)}",
         "tg_link": f"https://t.me/{TELEGRAM_BOT_USERNAME}",
     }
@@ -601,7 +691,10 @@ def booking_pdf_route(booking_id: int):
     book = get_prebooking(booking_id)
     if not book:
         raise HTTPException(status_code=404, detail="Réservation introuvable")
-    from booking_pdf import booking_pdf
+    from booking_pdf import _is_paid, booking_pdf
+
+    if not _is_paid(book):
+        raise HTTPException(status_code=403, detail="Voucher disponible après paiement")
 
     return Response(
         content=booking_pdf(book),
@@ -617,7 +710,10 @@ def booking_qr_route(booking_id: int):
     book = get_prebooking(booking_id)
     if not book:
         raise HTTPException(status_code=404, detail="Réservation introuvable")
-    from booking_pdf import qr_code_png, qr_payload
+    from booking_pdf import _is_paid, qr_code_png, qr_payload
+
+    if not _is_paid(book):
+        raise HTTPException(status_code=403, detail="QR disponible après paiement")
 
     return Response(content=qr_code_png(qr_payload(book.id)), media_type="image/png")
 
