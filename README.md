@@ -55,12 +55,12 @@ ngrok http 8000
 `AI_PROVIDER` : `mistral` (test, gratuit) → `claude` (prod, qualité max).
 Sans clé API, le bot répond avec une base de connaissance locale (fallback).
 
-## Déploiement (Render / Railway)
+## Déploiement (Railway + Neon)
 
-- Build : `pip install -r requirements.txt`
-- Start : `uvicorn main:app --host 0.0.0.0 --port $PORT`
-- Pour Telegram en polling sur Render : ajouter `python telegram_bot.py`
-  comme service secondaire (ou utiliser un webhook Telegram).
+- Build : `Dockerfile` (Railway le détecte).
+- Start : `bash start.sh` → API FastAPI (`$PORT`) **et** bot Telegram (polling) dans un seul service.
+- Base : Neon (`DATABASE_URL` pooled). Schéma créé au démarrage.
+- Détails : voir [DEPLOY.md](DEPLOY.md).
 
 ## Paiement
 

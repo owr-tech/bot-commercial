@@ -1,100 +1,99 @@
-# Déploiement — Guide pas à pas
+# Déploiement — Guide pas à pas (Railway + Neon)
 
 ## 1. Pousser le code sur GitHub
 
-Créez un repo vide sur github.com (ex : `popaix-bot`, ne **pas** cocher README), puis :
+Repo : `https://github.com/revivaltent91-bot/popaix-bot`
 
 ```bash
-cd popaix-bot
-git remote add origin https://github.com/VOTRE_USER/popaix-bot.git
-git branch -M main
-git push -u origin main
+git add -A && git commit -m "..." && git push origin main
 ```
 
-Si `Permission denied (publickey)` : générez une clé et ajoutez-la à GitHub.
+## 2. Base de données — Neon
+
+1. https://neon.tech → créer un projet.
+2. Récupérer la chaîne **pooled** (hostname suffixé `-pooler`) :
+   `postgresql://...-pooler.../neondb?sslmode=require`
+3. Le schéma (3 tables) est créé automatiquement au premier démarrage.
+
+## 3. Déployer sur Railway
+
+### Via la CLI
+
 ```bash
-ssh-keygen -t ed25519 -C "votre@email.com"   # tout par défaut
-cat ~/.ssh/id_ed25519.pub                    # coller dans github.com → Settings → SSH keys
+npm i -g @railway/cli
+railway login
+railway init --name popaix-bot
+railway add --service popaix-bot
+# injecter les variables (voir tableau ci-dessous), puis :
+railway up --service popaix-bot
 ```
-Puis `git push -u origin main`.
 
-## 2. Déployer sur Render
+### Via le dashboard
 
-1. Rendez-vous sur https://render.com → **New → Blueprint**
-2. Choisissez le repo `popaix-bot` **public**
-3. Render détecte automatiquement `render.yaml` et crée :
-   - **popaix-bot-api** (web) → `uvicorn main:app --port $PORT`
-   - **popaix-telegram** (worker) → `python telegram_bot.py`
-   - **popaix-db** (PostgreSQL gratuit)
-4. Dans chaque service, renseignez les **secrets** promis par le blueprint :
+**New Project → Deploy from GitHub repo** (`popaix-bot`). Railway détecte le `Dockerfile`.
 
-| Clé | Web | Worker | Description |
-|---|---|---|---|
-| MISTRAL_API_KEY | ✅ | ✅ | Clé API Mistral (console.mistral.ai) |
-| ANTHROPIC_API_KEY | ✅ | ✅ | Clé API Claude (console.anthropic.com) |
-| WHATSAPP_TOKEN | ✅ | — | Token d'accès Meta **System User** (scopes `whatsapp_business_messaging` + `whatsapp_business_management`) |
-| WHATSAPP_PHONE_ID | ✅ | — | Numéro téléphone WhatsApp Business |
-| WABA_ID | ✅ | — | WhatsApp Business Account ID (Flows) |
-| WA_FLOW_NAME | ✅ | — | Nom du Flow (défaut `popaix_dates`) |
-| WHATSAPP_REDIRECT_NUMBER | ✅ | — | Numéro `wa.me` de retour (défaut `2250702391982`) |
-| VERIFY_TOKEN | ✅ | — | Votre code secret (ex `popaix2026`) |
-| TELEGRAM_TOKEN | ✅ | ✅ | Token du bot via @BotFather |
-| TELEGRAM_BOT_USERNAME | ✅ | — | Username Telegram (lien `t.me/<username>`) |
-| PUBLIC_BASE_URL | ✅ | ✅ | Base des liens `/booking/<id>` (URL Render) |
-| BOOKING_MAX_MONTHS | ✅ | ✅ | Horizon de réservation (défaut `12`) |
-| PAYDUNYA_MASTER_KEY | ✅ | ✅ | Clé PayDunya (test ou live) |
-| PAYDUNYA_PRIVATE_KEY | ✅ | ✅ | Clé privée PayDunya |
-| PAYDUNYA_TOKEN | ✅ | ✅ | Token application PayDunya |
-| PAYDUNYA_ENV | ✅ | ✅ | `test` (sandbox) ou `live` |
-| PAYDUNYA_CALLBACK_URL | ✅ | — | `https://popaix-bot-api.onrender.com/webhook/paydunya` |
+- Un **seul service** suffit : `start.sh` lance l'API FastAPI **et** le bot Telegram (polling).
+- Exposer le port : Railway injecte `PORT`, `start.sh` l'utilise.
+- Générer un domaine : `railway domain --service popaix-bot`.
 
-> ⚠️ Sur le **plan gratuit**, Render fait dormir le web service après 15 min d'inactivité
-> (réveil = ~30s la première fois). Le worker Telegram, lui, tourne en continu.
+### Variables d'environnement
 
-## 3. Configurer WhatsApp Cloud API (Meta)
+| Clé | Description |
+|---|---|
+| AI_PROVIDER | `mistral` (test) ou `claude` (prod) |
+| MISTRAL_API_KEY | Clé API Mistral |
+| ANTHROPIC_API_KEY | Clé API Claude (si `AI_PROVIDER=claude`) |
+| WHATSAPP_TOKEN | Token Meta **System User** (scopes messaging + management) |
+| WHATSAPP_PHONE_ID | Numéro WhatsApp Business |
+| WABA_ID | WhatsApp Business Account ID (Flows) |
+| WA_FLOW_NAME | Nom du Flow (défaut `popaix_dates`) |
+| WHATSAPP_REDIRECT_NUMBER | Numéro `wa.me` de retour |
+| VERIFY_TOKEN | Secret webhook Meta (ex `popaix2026`) |
+| TELEGRAM_TOKEN | Token BotFather |
+| TELEGRAM_BOT_USERNAME | Username Telegram |
+| DATABASE_URL | Chaîne **pooled** Neon |
+| PUBLIC_BASE_URL | `https://<service>.up.railway.app` |
+| BOOKING_MAX_MONTHS | `12` |
+| PAYMENT_PROVIDER | `paydunya` |
+| PAYDUNYA_ENV | `test` ou `live` |
+| PAYDUNYA_MASTER_KEY / PRIVATE_KEY / TOKEN | Clés PayDunya |
+| PAYDUNYA_CALLBACK_URL | `https://<service>.up.railway.app/webhook/paydunya` |
+| PAYDUNYA_RETURN_URL | `https://<service>.up.railway.app` |
+| ADMIN_SECRET | Protège `/admin/set-telegram-webhook` |
 
-1. https://developers.facebook.com/apps → créer app **Business**
-2. Ajouter produit **WhatsApp** → obtenez le **Token** et le **Phone number ID**
-3. Testez : `curl "https://graph.facebook.com/v19.0/<PHONENUMID>/messages" -H "Authorization: Bearer <TOKEN>"` (200 = ok)
-4. **Webhook** (l'URL de votre service Render) :
-   - Callback URL : `https://popaix-bot-api.onrender.com/webhook`
-   - Verify token : `popaix2026` (ou votre `VERIFY_TOKEN`)
-5. Abonnez l'événement **messages** dans la config du webhook
-6. **Flows** (calendrier + chambres) : le token doit avoir les scopes
-   `whatsapp_business_management` + `whatsapp_business_messaging`.
-   Le Flow est créé/republié automatiquement au démarrage.
-   Si l'API Flows est indisponible, le bot bascule sur le **repli**
-   (saisie texte des dates + liste des chambres + cartes images).
+> `PUBLIC_BASE_URL`, `PAYDUNYA_CALLBACK_URL` et `PAYDUNYA_RETURN_URL` doivent utiliser
+> le domaine Railway. Après modification d'une variable : `railway redeploy -y`.
 
-Pour une mise en prod : ouvrez le **numéro de test** via Configuration du téléphone
-(touches WhatsApp Business API — valide 30 jours pour tester).
+## 4. Configurer WhatsApp Cloud API (Meta)
 
-## 4. Créer le bot Telegram
+1. https://developers.facebook.com/apps → app **Business** → produit **WhatsApp**.
+2. Récupérer le **Token** et le **Phone number ID**.
+3. **Webhook** :
+   - Callback URL : `https://<service>.up.railway.app/webhook`
+   - Verify token : valeur de `VERIFY_TOKEN`
+4. S'abonner à l'événement **messages**.
+5. **Flows** : scopes `whatsapp_business_management` + `whatsapp_business_messaging`.
+   Le Flow est créé/republié automatiquement. Si l'API Flows est indisponible, le bot
+   bascule sur le **repli** (saisie texte des dates + liste des chambres + cartes images).
 
-1. Ouvrez [@BotFather](tg://resolve?domain=botfather), ` /newbot `, choisissez un nom.
-2. Copiez le **token** → collage dans les secrets Render (`TELEGRAM_TOKEN`).
-3. Le worker le démarre automatiquement (polling).
+## 5. Telegram
 
-## 5. Vérification
+Rien à configurer : le bot tourne en **polling** (`python telegram_bot.py`) dans `start.sh`.
+Éviter de lancer un second process polling avec le même token (conflit `getUpdates`).
 
-- API : `https://popaix-bot-api.onrender.com/health` → `{"status":"ok"}`
-- Admin : `https://popaix-bot-api.onrender.com/admin`
-- WhatsApp : envoyez « bonjour » au numéro du test
-- Telegram : envoyez `/start` à votre bot
-- Paiement : après une réservation, le client reçoit le **lien PayDunya** ; une fois payé,
-  le callback `/webhook/paydunya` marque la réservation `paid`, envoie la confirmation
-  **+ le voucher PDF avec QR** (à présenter à la réception).
-  - Page voucher : `https://popaix-bot-api.onrender.com/booking/<id>`
-  - PDF : `/booking/<id>/pdf` · QR : `/booking/<id>/qr.png`
-  Test : `curl -X POST https://popaix-bot-api.onrender.com/webhook/paydunya \
-   -d "data[status]=completed" -d "data[hash]=..." -d "data[invoice][token]=test_xxx"`
+## 6. Vérification
 
-## 6. Passer en PRODUCTION
+- Santé : `https://<service>.up.railway.app/health` → `{"status":"ok"}`
+- Admin : `https://<service>.up.railway.app/admin`
+- Telegram : `/start` au bot → présentation + cartes chambres
+- WhatsApp : « bonjour » au numéro de test
+- Paiement : le client reçoit le **lien PayDunya** ; le callback `/webhook/paydunya`
+  marque la réservation `paid` puis envoie la confirmation **+ le voucher PDF (QR)**.
+  - Voucher : `/booking/<id>` · PDF : `/booking/<id>/pdf` · QR : `/booking/<id>/qr.png`
 
-1. Achetez le numéro WhatsApp Business officiel
-2. `AI_PROVIDER=claude` + remplissez `ANTHROPIC_API_KEY`
-3. Paiement PayDunya : `PAYMENT_PROVIDER=paydunya`, `PAYDUNYA_ENV=live` et
-   les clés LIVE (`PAYDUNYA_LIVE_MASTER_KEY`, `PAYDUNYA_LIVE_PRIVATE_KEY`,
-   `PAYDUNYA_LIVE_TOKEN`) dans les **secrets Render** (web + worker).
-   Le **callback** `PAYDUNYA_CALLBACK_URL=https://popaix-bot-api.onrender.com/webhook/paydunya`
-   doit pointer vers votre web service Render.
+## 7. Passer en PRODUCTION
+
+1. Acheter le numéro WhatsApp Business officiel.
+2. `AI_PROVIDER=claude` + `ANTHROPIC_API_KEY`.
+3. PayDunya : `PAYDUNYA_ENV=live` + clés LIVE, puis mettre à jour
+   `PAYDUNYA_CALLBACK_URL` vers le domaine Railway et `railway redeploy -y`.
