@@ -1,0 +1,10 @@
+venv/
+__pycache__/
+*.pyc
+*.db
+.git/
+.tiket_cache.json
+.env
+.vercel
+voucher_sample.pdf
+PAT-GITHUB

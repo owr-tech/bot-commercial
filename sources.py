@@ -9,6 +9,7 @@ URL : https://www.tiket.com/en-us/hotel/cote-divoire/hotel-popaix-70700172194202
 import json
 import os
 import re
+import tempfile
 import time
 from datetime import datetime
 
@@ -19,7 +20,10 @@ from knowledge import POPAIX_KNOWLEDGE
 TIKET_KNOWLEDGE = POPAIX_KNOWLEDGE["tiket"]
 
 TIKET_URL = "https://www.tiket.com/en-us/hotel/cote-divoire/hotel-popaix-707001721942024071"
-CACHE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".tiket_cache.json")
+# Sur Vercel le FS projet est en lecture seule → cache dans /tmp (éphémère).
+CACHE_FILE = os.getenv("TIKET_CACHE_FILE") or os.path.join(
+    tempfile.gettempdir(), ".tiket_cache.json"
+)
 TTL_SECONDS = 6 * 3600  # rafraîchit au plus toutes les 6h
 
 # --- Extraction best-effort depuis le HTML/texte de la page -----------------
@@ -63,14 +67,18 @@ def _load_cache() -> dict:
     try:
         with open(CACHE_FILE, encoding="utf-8") as f:
             return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
         return {}
 
 
 def _save_cache(data: dict):
     data["_fetched_at"] = datetime.utcnow().isoformat()
-    with open(CACHE_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    try:
+        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except OSError as e:
+        # FS en lecture seule (serverless) → le cache est optionnel, on continue.
+        print(f"[TIKET][WARN] cache non écrit: {e}")
 
 
 def get_tiket_data(force_refresh: bool = False) -> dict:

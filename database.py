@@ -27,6 +27,7 @@ engine = create_engine(
     connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {
         "sslmode": "require"
     },
+    pool_pre_ping=True,
 )
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
@@ -53,8 +54,12 @@ class Prebooking(Base):
     check_out = Column(String, nullable=True)
     room_type = Column(String, nullable=True)  # T1-T4
     phone = Column(String, nullable=True)
-    status = Column(String, default="pending")  # pending | confirmed | paid
+    status = Column(String, default="pending")  # pending | confirmed | paid | awaiting_payment
     notes = Column(Text, nullable=True)
+    amount_due = Column(Integer, nullable=True)  # FCFA
+    amount_paid = Column(Integer, nullable=True, default=0)  # FCFA
+    payment_ref = Column(String, nullable=True)  # invoice_token PayDunya
+    paid_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
@@ -70,6 +75,33 @@ class SessionState(Base):
 
 
 Base.metadata.create_all(bind=engine)
+
+
+def _ensure_payment_columns():
+    """Migration légère : ajoute les colonnes paiement si la table prebookings existe déjà."""
+    try:
+        from sqlalchemy import inspect, text
+
+        cols = {c["name"] for c in inspect(engine).get_columns("prebookings")}
+        missing = [
+            c
+            for c in ["amount_due", "amount_paid", "payment_ref", "paid_at"]
+            if c not in cols
+        ]
+        ddl = {
+            "amount_due": "INTEGER",
+            "amount_paid": "INTEGER",
+            "payment_ref": "VARCHAR",
+            "paid_at": "DATETIME",
+        }
+        for name in missing:
+            with engine.begin() as conn:
+                conn.execute(text(f"ALTER TABLE prebookings ADD COLUMN {name} {ddl[name]}"))
+    except Exception as e:
+        print(f"[DB][WARN] migration paiement ignorée: {e}")
+
+
+_ensure_payment_columns()
 
 
 def get_db():
@@ -105,6 +137,8 @@ def save_prebooking(
     room_type: Optional[str] = None,
     phone: Optional[str] = None,
     notes: Optional[str] = None,
+    amount_due: Optional[int] = None,
+    amount_paid: int = 0,
 ) -> Prebooking:
     db = SessionLocal()
     try:
@@ -117,11 +151,48 @@ def save_prebooking(
             room_type=room_type,
             phone=phone,
             notes=notes,
+            amount_due=amount_due,
+            amount_paid=amount_paid,
         )
         db.add(book)
         db.commit()
         db.refresh(book)
         return book
+    finally:
+        db.close()
+
+
+def get_prebooking(prebooking_id: int) -> Optional[Prebooking]:
+    db = SessionLocal()
+    try:
+        return db.query(Prebooking).filter(Prebooking.id == prebooking_id).first()
+    finally:
+        db.close()
+
+
+def update_prebooking_payment(prebooking_id: int, payment_ref: str, status: Optional[str] = None):
+    """Attache la référence PayDunya à la pré-réservation (et optionnellement le statut)."""
+    db = SessionLocal()
+    try:
+        row = db.query(Prebooking).filter(Prebooking.id == prebooking_id).first()
+        if row:
+            row.payment_ref = payment_ref
+            if status:
+                row.status = status
+            db.commit()
+    finally:
+        db.close()
+
+
+def mark_prebooking_paid(prebooking_id: int, amount_paid: int):
+    db = SessionLocal()
+    try:
+        row = db.query(Prebooking).filter(Prebooking.id == prebooking_id).first()
+        if row:
+            row.status = "paid"
+            row.amount_paid = amount_paid or row.amount_due
+            row.paid_at = datetime.utcnow()
+            db.commit()
     finally:
         db.close()
 
@@ -226,6 +297,9 @@ def get_stats() -> dict:
         prebookings = db.query(Prebooking).count()
         confirmed = db.query(Prebooking).filter(Prebooking.status == "confirmed").count()
         paid = db.query(Prebooking).filter(Prebooking.status == "paid").count()
+        awaiting_payment = db.query(Prebooking).filter(Prebooking.status == "awaiting_payment").count()
+        pending = db.query(Prebooking).filter(Prebooking.status == "pending").count()
+        cancelled = db.query(Prebooking).filter(Prebooking.status == "cancelled").count()
         whatsapp_convs = db.query(Conversation).filter(Conversation.channel == "whatsapp").count()
         telegram_convs = db.query(Conversation).filter(Conversation.channel == "telegram").count()
         return {
@@ -235,6 +309,9 @@ def get_stats() -> dict:
             "prebookings": prebookings,
             "confirmed": confirmed,
             "paid": paid,
+            "awaiting_payment": awaiting_payment,
+            "pending": pending,
+            "cancelled": cancelled,
         }
     finally:
         db.close()

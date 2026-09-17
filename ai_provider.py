@@ -19,7 +19,7 @@ def load_system_prompt() -> str:
                 SYSTEM_PROMPT = f.read()
         except FileNotFoundError:
             SYSTEM_PROMPT = (
-                "Tu es PopaixBot, assistant de l'Hôtel Pôpaix. "
+                "Tu es PopaixBot, assistant de PO PAIX HOTEL ET EXPERIENCES. "
                 "Réponds en français ivoirien, court et chaleureux."
             )
     return SYSTEM_PROMPT
@@ -106,14 +106,12 @@ def fallback_reply(user_message: str) -> str:
     if any(w in msg for w in ["prix", "tarif", "combien", "coût", "cout", "cher"]):
         return (
             "Nos chambres : 🛏️ T1 = 25.000 F · T2 = 30.000 F · T3 = 35.000 F · "
-            "T4 = 40.000 F par nuit. 🍕 Sorbets 2.000 F, Pizza Margherita 4.000 F + boisson. "
-            # "Réouverture le 15 décembre 2026 🌴"
+            "T4 = 40.000 F par nuit. 🍕 Sorbets 2.000 F, Pizza Margherita 4.000 F + boisson."
         )
-    if any(w in msg for w in ["réouverture", "ouvre", "reouverture", "quand", "date"]):
+    if any(w in msg for w in ["réouverture", "ouvre", "reouverture", "quand", "date", "ouvert"]):
         return (
-            # "On rouvre le 15 décembre 2026 à 16h ! 🎉 "
-            "Nouveauté : une belle piscine. "
-            "Les pré-réservations sont OUVERTES. Dites-moi 'pré-réserver' pour réserver votre chambre."
+            "L'hôtel est OUVERT dès aujourd'hui 🎉 "
+            "Réservation disponible immédiatement. Dites 'pré-réserver' pour réserver votre chambre."
         )
     if any(w in msg for w in ["chambre", "lit", "suite"]):
         return (
@@ -129,20 +127,21 @@ def fallback_reply(user_message: str) -> str:
             "1️⃣ Votre nom complet\n"
             "2️⃣ Les dates (arrivée et départ)\n"
             "3️⃣ Le type de chambre : T1 (25.000F), T2 (30.000F), T3 (35.000F) ou T4 (40.000F)\n\n"
-            "Ex : 'Je suis Jean Kouassi, du 20 au 25 décembre 2026, chambre T2'"
+            "Ex : 'Je suis Jean Kouassi, du 20 au 25, chambre T2'"
         )
     if any(
         w in msg
         for w in ["contact", "adresse", "téléphone", "telephone", "whatsapp", "numéro"]
     ):
         return (
-            "Vous pouvez nous joindre au 01 42 30 84 84 ou sur @hotelpopaix 📞 "
+            "Vous pouvez nous joindre au +225 0702391982 ou sur @hotelpopaix 📞 "
             "Nous sommes face plage/lagune Koyiri à Fresco, Côte d'Ivoire."
         )
     if any(w in msg for w in ["paiement", "payer", "wave", "orange", "mtn", "espèces"]):
         return (
-            "Paiement en espèces, Wave, Orange Money ou MTN Money 💳 "
-            "Facile et sécurisé. Dites 'pré-réserver' pour lancer la résa."
+            "Le paiement se fait en ligne (Wave, Orange Money, MTN Money ou carte) "
+            "via le lien sécurisé PayDunya envoyé à la fin de votre réservation 💳 "
+            "Ou en espèces sur place. Dites 'pré-réserver' pour lancer la résa."
         )
     if any(w in msg for w in ["resto", "restaurant", "pizza", "manger", "menu"]):
         return (
@@ -183,8 +182,8 @@ def fallback_reply(user_message: str) -> str:
             "Dites 'pré-réserver' pour lancer la réservation."
         )
     return (
-        "Bienvenue à l'Hôtel Pôpaix 🌴  chambres face plage à Fresco. "
-        "Notre nouvelle piscine disponible  piscine ! Les pré-réservations sont ouvertes. "
+        "Bienvenue à PO PAIX HOTEL ET EXPERIENCES 🌴 23 chambres face plage à Fresco. "
+        "L'hôtel est OUVERT — réservations ouvertes dès aujourd'hui ! "
         "Demandez-moi les prix, les chambres ou écrivez 'pré-réserver'."
     )
 

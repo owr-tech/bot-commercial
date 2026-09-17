@@ -36,11 +36,23 @@ ngrok http 8000
 - Dashboard : `http://localhost:8000/admin`
 - Stats JSON : `http://localhost:8000/api/stats`
 - Pré-réservations : `http://localhost:8000/api/prebookings`
+- Voucher client : `http://localhost:8000/booking/<id>` (+ `/pdf`, `/qr.png`)
+- Détail JSON : `http://localhost:8000/api/booking/<id>`
 - Santé : `http://localhost:8000/health`
+
+## Réservation (UI générative — standard OpenUI)
+
+- **Dates** : chaque canal a son rendu du composant `DateRangePicker`.
+  - Telegram : calendrier inline (mois ◀ ▶, jours passés désactivés).
+  - WhatsApp : **Flow** natif v5.0 (2 écrans `DATES` → `ROOM`), repli en saisie texte.
+  - Borne : aujourd'hui → `BOOKING_MAX_MONTHS` mois (défaut 12).
+- **Chambres T1-T4** : cartes `RoomCard` (image + description + prix).
+  - Telegram : album photo + clavier inline.
+  - WhatsApp : images + liste interactive (ou images dans le Flow).
 
 ## Chat IA
 
-`AI_PROVIDER` : `mistral` (test, gratuit) → `claude` (prod à partir du 15 déc).
+`AI_PROVIDER` : `mistral` (test, gratuit) → `claude` (prod, qualité max).
 Sans clé API, le bot répond avec une base de connaissance locale (fallback).
 
 ## Déploiement (Render / Railway)
@@ -52,5 +64,9 @@ Sans clé API, le bot répond avec une base de connaissance locale (fallback).
 
 ## Paiement
 
-`PAYMENT_PROVIDER=wave` ou `orange` pour activer les liens de paiement
-Wave / Orange Money. Sans clés, le bot donne les instructions par téléphone.
+`PAYMENT_PROVIDER=paydunya` + clés (`PAYDUNYA_MASTER_KEY`, `PAYDUNYA_PRIVATE_KEY`,
+`PAYDUNYA_TOKEN`, `PAYDUNYA_CALLBACK_URL`) pour finaliser la réservation par
+paiement en ligne sécurisé (Wave, Orange Money, MTN Money, carte) via **PayDunya**.
+Le bot envoie un lien de paiement à la fin de la réservation ; le webhook
+`/webhook/paydunya` confirme le règlement et passe la réservation au statut `paid`.
+Sans clés, le bot donne les instructions par téléphone (espèces sur place).

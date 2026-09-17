@@ -1,111 +1,150 @@
+import hashlib
+import hmac
 import os
 from typing import Optional
 
 import requests
 
-PAYMENT_PROVIDER = os.getenv("PAYMENT_PROVIDER", "none").lower()  # wave | orange | none
+PAYMENT_PROVIDER = os.getenv("PAYMENT_PROVIDER", "none").lower()  # none | paydunya
 
 
-class WaveAPI:
-    BASE_URL = "https://api.wave.com/v1"
-
-    def __init__(self):
-        self.client_id = os.getenv("WAVE_CLIENT_ID")
-        self.client_secret = os.getenv("WAVE_CLIENT_SECRET")
-        self.access_token = None
-
-    def auth(self) -> Optional[str]:
-        res = requests.post(
-            f"{self.BASE_URL}/oauth/token",
-            data={
-                "client_id": self.client_id,
-                "client_secret": self.client_secret,
-                "grant_type": "client_credentials",
-            },
-        )
-        if res.ok:
-            self.access_token = res.json()["access_token"]
-        return self.access_token
-
-    def request_payment(self, amount_fcf: int, currency: str = "XOF", mobile: str = "") -> Optional[str]:
-        """Crée une demande de paiement. Retourne le payment_url."""
-        if not self.access_token:
-            self.auth()
-        res = requests.post(
-            f"{self.BASE_URL}/checkout/sessions",
-            headers={"Authorization": f"Bearer {self.access_token}"},
-            json={
-                "amount": {"currency": currency, "amount": str(amount_fcf)},
-                "mobile_money_number": mobile,
-                "success_redirect_url": os.getenv("WAVE_SUCCESS_URL", ""),
-            },
-        )
-        if res.ok:
-            return res.json().get("checkout_session_url")
-        return None
+def _env(key: str, default: str = "") -> str:
+    return os.getenv(key, default).strip()
 
 
-class OrangeMoneyAPI:
-    BASE_URL = "https://api.orange.com/omarizal"
+class PayDunyaAPI:
+    """Client de l'agrégateur PayDunya (Wave / Orange Money / MTN / espèces, carte)."""
+
+    BASE_SANDBOX = "https://app.paydunya.com/sandbox-api/v1"
+    BASE_LIVE = "https://app.paydunya.com/api/v1"
 
     def __init__(self):
-        self.client_id = os.getenv("ORANGE_CLIENT_ID")
-        self.client_secret = os.getenv("ORANGE_CLIENT_SECRET")
-        self.access_token = None
+        self.env = _env("PAYDUNYA_ENV", "test").lower()
+        self.master_key = _env(
+            f"PAYDUNYA_{'LIVE' if self.env == 'live' else 'TEST'}_MASTER_KEY"
+        ) or _env("PAYDUNYA_MASTER_KEY")
+        self.private_key = _env(
+            f"PAYDUNYA_{'LIVE' if self.env == 'live' else 'TEST'}_PRIVATE_KEY"
+        ) or _env("PAYDUNYA_PRIVATE_KEY")
+        self.token = _env(
+            f"PAYDUNYA_{'LIVE' if self.env == 'live' else 'TEST'}_TOKEN"
+        ) or _env("PAYDUNYA_TOKEN")
+        self.store_name = _env("PAYDUNYA_STORE_NAME", "HOTEL POPAIX")
 
-    def auth(self) -> Optional[str]:
-        import base64
+    @property
+    def base_url(self) -> str:
+        return self.BASE_LIVE if self.env == "live" else self.BASE_SANDBOX
 
-        auth = base64.b64encode(
-            f"{self.client_id}:{self.client_secret}".encode()
-        ).decode()
-        res = requests.post(
-            "https://api.orange.com/oauth/v2/token",
-            headers={"Authorization": f"Basic {auth}"},
-            data={"grant_type": "client_credentials"},
-        )
-        if res.ok:
-            self.access_token = res.json()["access_token"]
-        return self.access_token
+    def configured(self) -> bool:
+        return bool(self.master_key and self.private_key and self.token)
 
-    def request_payment(self, msisdn: str, amount_fcf: int) -> Optional[str]:
-        if not self.access_token:
-            self.auth()
-        res = requests.post(
-            f"{self.BASE_URL}/v1/transactions/token",
-            headers={
-                "Authorization": f"Bearer {self.access_token}",
-                "X-Request-ID": os.getenv("ORANGE_REQUEST_ID", "popaixbot"),
-                "Content-Type": "application/json",
+    def _headers(self) -> dict:
+        return {
+            "Content-Type": "application/json",
+            "PAYDUNYA-MASTER-KEY": self.master_key,
+            "PAYDUNYA-PRIVATE-KEY": self.private_key,
+            "PAYDUNYA-TOKEN": self.token,
+        }
+
+    def create_invoice(
+        self,
+        total_fcf: int,
+        description: str,
+        name: str = "",
+        phone: str = "",
+        email: str = "",
+        items: Optional[dict] = None,
+        custom_data: Optional[dict] = None,
+        return_url: Optional[str] = None,
+        cancel_url: Optional[str] = None,
+    ) -> tuple[Optional[str], Optional[str]]:
+        """Crée une facture PayDunya. Retourne (checkout_url, invoice_token).
+
+        `return_url` / `cancel_url` : URLs spécifiques à cette facture
+        (les paramètres par défaut .env restent utilisés si non précisées).
+        """
+        if not self.configured():
+            return None, None
+        default_return = _env("PAYDUNYA_RETURN_URL")
+        default_cancel = _env("PAYDUNYA_RETURN_URL")
+        payload = {
+            "invoice": {
+                "total_amount": int(total_fcf),
+                "description": description,
+                "customer": {"name": name, "phone": phone, "email": email},
+                "items": items or {},
             },
-            json={
-                "phoneNumber": msisdn,
-                "callBackUrl": os.getenv("ORANGE_CALLBACK_URL", ""),
-                "amount": {"unit": amount_fcf, "currency": "XOF"},
+            "store": {"name": self.store_name},
+            "custom_data": custom_data or {},
+            "actions": {
+                "return_url": return_url or default_return,
+                "cancel_url": cancel_url or default_cancel,
+                "callback_url": _env("PAYDUNYA_CALLBACK_URL"),
             },
+        }
+        res = requests.post(
+            f"{self.base_url}/checkout-invoice/create",
+            headers=self._headers(),
+            json=payload,
+            timeout=30,
         )
-        if res.ok:
-            return res.json().get("token")
-        return None
+        if res.ok and res.json().get("response_code") == "00":
+            return res.json().get("response_text"), res.json().get("token")
+        print(f"[PAYDUNYA][ERROR] create: {res.status_code} {res.text}")
+        return None, None
+
+    def confirm(self, invoice_token: str) -> dict:
+        """Vérifie le statut d'une facture : pending | completed | cancelled | failed."""
+        if not self.configured():
+            return {}
+        res = requests.get(
+            f"{self.base_url}/checkout-invoice/confirm/{invoice_token}",
+            headers=self._headers(),
+            timeout=30,
+        )
+        return res.json() if res.ok else {}
+
+    def verify_hash(self, hash_value: str) -> bool:
+        """Vérifie la signature du callback PayDunya : SHA-512 du MasterKey."""
+        if not hash_value:
+            return False
+        expected = hashlib.sha512(self.master_key.encode()).hexdigest()
+        return hmac.compare_digest(hash_value.lower(), expected.lower())
 
 
-def request_payment(provider: str, mobile: str, amount_fcf: int):
-    """Dispatch vers le provider configuré. Retourne un lien/instructions ou None."""
-    provider = (provider or PAYMENT_PROVIDER).lower()
-    if provider == "wave":
-        return WaveAPI().request_payment(amount_fcf, mobile=mobile)
-    if provider in ("orange", "orange_money"):
-        return OrangeMoneyAPI().request_payment(mobile, amount_fcf)
-    return None
-
-
-def payment_instructions(prebooking_id: int, amount_fcf: int) -> str:
-    """Instructions de paiement envoyées au client après la pré-réservation."""
-    url = request_payment(PAYMENT_PROVIDER, "", amount_fcf)
-    base = (
-        f"💰 Pré-réservation #{prebooking_id} : {amount_fcf:,} FCFA\n"
-        "Paiement en espèces, Wave, Orange Money ou MTN Money.\n"
+def request_payment(
+    total_fcf: int,
+    description: str,
+    name: str = "",
+    phone: str = "",
+    email: str = "",
+    custom_data: Optional[dict] = None,
+    return_url: Optional[str] = None,
+    cancel_url: Optional[str] = None,
+) -> tuple[Optional[str], Optional[str]]:
+    """Point d'entrée unique : crée le paiement. Retourne (checkout_url, invoice_token)."""
+    if PAYMENT_PROVIDER != "paydunya":
+        return None, None
+    return PayDunyaAPI().create_invoice(
+        total_fcf,
+        description,
+        name=name,
+        phone=phone,
+        email=email,
+        custom_data=custom_data,
+        return_url=return_url,
+        cancel_url=cancel_url,
     )
-    if url:
-        return base + f"🔗 Payez ici : {url}"
-    return base + "📞 L'équipe vous appellera au 01 42 30 84 84 pour le paiement."
+
+
+def build_items(room_label: str, price_per_night: int, nights: int) -> dict:
+    """Items affichés sur la page de paiement PayDunya."""
+    return {
+        "item_0": {
+            "name": f"Séjour PO PAIX HOTEL ET EXPERIENCES - {room_label}",
+            "quantity": nights,
+            "unit_price": str(price_per_night),
+            "total_price": str(price_per_night * nights),
+            "description": f"{room_label} pour {nights} nuit(s)",
+        }
+    }

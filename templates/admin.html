@@ -3,108 +3,259 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pôpaix Bot — Admin</title>
+<title>Pôpaix — Régie des réservations</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-  :root { --green:#0b7a3b; --dark:#0f2a1c; --gold:#c9a13b; --bg:#f5f7f5; }
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:#1c2b24; }
-  header { background:var(--dark); color:#fff; padding:18px 24px; display:flex; justify-content:space-between; align-items:center; }
-  header h1 { font-size:20px; } header span { color:var(--gold); }
-  .badge { background:var(--green); padding:4px 10px; border-radius:20px; font-size:13px; }
-  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; padding:20px 24px; }
-  .card { background:#fff; border-radius:12px; padding:18px; box-shadow:0 2px 8px rgba(0,0,0,.06); border-left:4px solid var(--green); }
-  .card .num { font-size:30px; font-weight:700; }
-  .card .lbl { font-size:13px; color:#667; margin-top:4px; }
-  .table-wrap { padding:0 24px 30px; }
-  table { width:100%; border-collapse:collapse; background:#fff; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.06); }
-  th, td { padding:12px 14px; text-align:left; border-bottom:1px solid #eef1ee; font-size:14px; }
-  th { background:var(--dark); color:#fff; font-weight:600; }
-  tr:hover { background:#fafff9; }
-  .status { padding:3px 10px; border-radius:16px; font-size:12px; font-weight:600; }
-  .pending { background:#fff4d6; color:#8a6500; }
-  .confirmed { background:#dcf5ff; color:#006687; }
-  .paid { background:#d7f7e0; color:#0b7a3b; }
-  .cancelled { background:#ffe7e5; color:#a1332c; }
-  select { padding:5px 8px; border-radius:6px; border:1px solid #ccd; }
-  .empty { padding:40px; text-align:center; color:#899; }
-  .channel { font-size:12px; padding:2px 8px; border-radius:10px; background:#eceffa; }
-  footer { text-align:center; padding:18px; color:#899; font-size:12px; }
+  :root {
+    --ink: #0e3b2c;
+    --ink-soft: #1a5240;
+    --paper: #f6f1e6;
+    --card: #fffdf7;
+    --gold: #b08a2f;
+    --gold-soft: #e6d8ae;
+    --paid: #18794b;
+    --awaiting: #a16207;
+    --confirmed: #0f6e7c;
+    --cancelled: #a83434;
+    --muted: #75674f;
+    --hair: #e4dcc9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { min-height: 100%; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--paper);
+    color: #223027;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  a { color: inherit; }
+
+  header {
+    background: var(--ink);
+    color: #faf6e9;
+    padding: 22px 26px 18px;
+    border-bottom: 3px solid var(--gold);
+  }
+  .band { max-width: 1180px; margin: 0 auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .wordmark { font-family: 'Fraunces', serif; font-weight: 600; font-size: 28px; letter-spacing: .01em; line-height: 1.1; }
+  .wordmark small { display: block; font-family: 'Inter', sans-serif; font-weight: 400; font-size: 12px; letter-spacing: .22em; text-transform: none; color: var(--gold-soft); margin-top: 5px; }
+  .live { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #faf6e9; }
+  .live .dot { width: 9px; height: 9px; border-radius: 50%; background: #6fd3a0; }
+  .live .dot.wait { background: var(--gold-soft); }
+
+  main { max-width: 1180px; margin: 0 auto; padding: 22px 26px 46px; }
+
+  .strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 26px; }
+  .count { background: var(--card); border: 1px solid var(--hair); border-top: 2px solid var(--gold); padding: 13px 16px; }
+  .count .n { font-family: 'Fraunces', serif; font-weight: 600; font-size: 30px; line-height: 1; color: var(--ink); }
+  .count .k { font-size: 12px; color: var(--muted); margin-top: 7px; }
+
+  .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+  .toolbar h2 { font-family: 'Fraunces', serif; font-weight: 500; font-size: 21px; color: var(--ink); }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; }
+  .filters button {
+    font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;
+    border: 1px solid var(--hair); background: var(--card); color: var(--muted);
+    padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  }
+  .filters button:hover { border-color: var(--gold); color: var(--ink); }
+  .filters button.active { background: var(--ink); border-color: var(--ink); color: #faf6e9; }
+  .filters button [data-count]::before { content: " " attr(data-count); color: var(--gold-soft); }
+  .filters button.active [data-count]::before { color: var(--gold-soft); }
+
+  .search { display: flex; gap: 8px; }
+  .search input {
+    font-family: 'Inter', sans-serif; font-size: 13px; padding: 7px 12px;
+    border: 1px solid var(--hair); border-radius: 6px; background: var(--card);
+    width: 210px; color: #223027;
+  }
+  .search input:focus, .filters button:focus-visible, select:focus-visible {
+    outline: 2px solid var(--gold); outline-offset: 1px;
+  }
+
+  .panel { background: var(--card); border: 1px solid var(--hair); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--hair); vertical-align: middle; }
+  thead th {
+    font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600;
+    letter-spacing: .06em; color: var(--ink); background: #f0ead8; white-space: nowrap;
+  }
+  tbody tr { background: var(--card); }
+  tbody tr[data-status="paid"] { background: #f3f9f4; }
+  tbody tr[data-status="awaiting_payment"] { background: #fdf8ea; }
+  tbody tr[data-status="cancelled"] { background: #fbf3f1; }
+  tbody tr:hover { background: #fbf7ec; }
+  .guest b { font-weight: 600; color: #1d2b22; }
+  .channel { font-size: 11px; color: var(--muted); border: 1px solid var(--hair); padding: 1px 7px; border-radius: 999px; margin-left: 6px; }
+  .stay { white-space: nowrap; color: #3a4a40; }
+  .room { font-family: 'Fraunces', serif; font-weight: 600; color: var(--ink); }
+  .mono { font-variant-numeric: tabular-nums; }
+  .pay { font-size: 13px; }
+  .pay .due { color: var(--muted); }
+  .pay .ok { color: var(--paid); font-weight: 600; }
+  .pay .wait { color: var(--awaiting); font-weight: 600; }
+  .pay .ref { display: block; font-size: 11px; color: var(--muted); }
+  a.tel { text-decoration: none; color: #3a4a40; }
+  a.tel:hover { color: var(--ink); text-decoration: underline; }
+  .status { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+  .status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; }
+  .status.pending::before { background: #c99b3f; }
+  .status.awaiting_payment::before { background: var(--awaiting); }
+  .status.confirmed::before { background: var(--confirmed); }
+  .status.paid::before { background: var(--paid); }
+  .status.cancelled::before { background: var(--cancelled); }
+  select {
+    font-family: 'Inter', sans-serif; font-size: 12.5px; color: #223027;
+    border: 1px solid var(--hair); border-radius: 5px; background: var(--card); padding: 5px 7px;
+  }
+  .empty { padding: 42px 20px; text-align: center; color: var(--muted); font-size: 14px; }
+  .empty strong { display: block; font-family: 'Fraunces', serif; font-weight: 500; font-size: 19px; color: var(--ink); margin-bottom: 6px; }
+  .retry { margin-top: 10px; border: 1px solid var(--gold); background: var(--card); color: var(--ink); padding: 6px 14px; border-radius: 999px; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 13px; }
+  footer { max-width: 1180px; margin: 0 auto; padding: 0 26px 28px; text-align: center; font-size: 12px; color: var(--muted); }
+  @media (max-width: 640px) {
+    header { padding: 18px 16px 14px; }
+    main { padding: 18px 12px 34px; }
+    th, td { padding: 9px 8px; }
+    .search input { width: 150px; }
+    .wordmark { font-size: 23px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
 <body>
 <header>
-  <h1>🌴 Hôtel <span>Pôpaix</span> — Console Admin</h1>
-  <span class="badge">Bot WhatsApp + Telegram</span>
+  <div class="band">
+    <div>
+      <div class="wordmark">Hôtel Pôpaix<small>RÉGIE DES RÉSERVATIONS</small></div>
+    </div>
+    <div class="live"><span class="dot"></span><span id="liveLabel">Ouvert — aucune restriction</span></div>
+  </div>
 </header>
 
-<section class="cards" id="cards"></section>
+<main>
+  <section class="strip" id="counts" aria-label="Vue d'ensemble"></section>
 
-<div class="table-wrap">
-  <h2 style="margin:0 0 12px;">Pré-réservations</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>#</th><th>Client</th><th>Canal</th><th>Arrivée</th><th>Départ</th>
-        <th>Chambre</th><th>Tél</th><th>Statut</th><th>Action</th>
-      </tr>
-    </thead>
-    <tbody id="tbody"></tbody>
-  </table>
-  <div class="empty" id="empty">Chargement…</div>
-</div>
+  <div class="toolbar">
+    <h2>Pré-réservations</h2>
+    <div class="filters" id="filters" role="group" aria-label="Filtrer par statut"></div>
+    <div class="search"><input id="q" type="search" placeholder="Nom, téléphone ou référence" aria-label="Rechercher"></div>
+  </div>
 
-<footer>POPAIX BOT · Données stockées localement / Supabase · Réouverture 15 déc 2026</footer>
+  <div class="panel">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Client</th><th>Séjour</th><th>Chambre</th><th>Téléphone</th><th>Paiement</th><th>Statut</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty" id="empty">Chargement…</div>
+  </div>
+</main>
+
+<footer>Pôpaix · base locale popaix.db · mise à jour auto toutes les 30 s</footer>
 
 <script>
 const STATUS = {
-  pending: 'En attente', confirmed: 'Confirmée', paid: 'Payée', cancelled: 'Annulée'
+  pending: 'En attente', awaiting_payment: 'En paiement', confirmed: 'Confirmée', paid: 'Payée', cancelled: 'Annulée'
 };
+const ORDER = {
+  awaiting_payment: 0, paid: 1, pending: 2, confirmed: 3, cancelled: 4
+};
+let DATA = [];
+let filter = 'all';
+let query = '';
 
-function renderCards(stats) {
-  const cards = [
-    ['Conversations', stats.conversations ?? 0],
-    ['WhatsApp', stats.whatsapp_conversations ?? 0],
-    ['Telegram', stats.telegram_conversations ?? 0],
-    ['Pré-réservations', stats.prebookings ?? 0],
-    ['Confirmées', stats.confirmed ?? 0],
+const $ = id => document.getElementById(id);
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function money(n) {
+  if (n == null) return null;
+  return new Intl.NumberFormat('fr-FR').format(n) + ' F';
+}
+
+function renderCounts(stats) {
+  $('counts').innerHTML = [
+    ['Reservations', stats.prebookings ?? 0],
+    ['En paiement', stats.awaiting_payment ?? 0],
     ['Payées', stats.paid ?? 0],
-  ];
-  document.getElementById('cards').innerHTML = cards.map(([l, n]) => `
-    <div class="card"><div class="num">${n}</div><div class="lbl">${l}</div></div>
-  `).join('');
+    ['Confirmées', stats.confirmed ?? 0],
+    ['En attente', stats.pending ?? 0],
+    ['Annulées', stats.cancelled ?? 0],
+    ['Conversations', stats.conversations ?? 0],
+  ].map(([k, n]) => `<div class="count"><div class="n">${n}</div><div class="k">${k}</div></div>`).join('');
 }
 
-function formatDate(iso) {
-  if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('fr-FR');
+function renderFilters() {
+  const counts = { all: DATA.length };
+  for (const b of DATA) counts[b.status] = (counts[b.status] || 0) + 1;
+  const keys = ['all', 'awaiting_payment', 'paid', 'pending', 'confirmed', 'cancelled'];
+  $('filters').innerHTML = keys.map(k => {
+    const label = k === 'all' ? 'Tous' : STATUS[k];
+    return `<button data-f="${k}" class="${filter === k ? 'active' : ''}"><span data-count="${counts[k] || 0}">${label}</span></button>`;
+  }).join('');
+  $('filters').querySelectorAll('button').forEach(b => b.onclick = () => { filter = b.dataset.f; render(); });
 }
 
-function renderPrebookings(rows) {
-  const tbody = document.getElementById('tbody');
-  const empty = document.getElementById('empty');
+function renderTable() {
+  const tbody = $('tbody');
+  const empty = $('empty');
+  const q = query.trim().toLowerCase();
+  let rows = DATA.filter(b => filter === 'all' || b.status === filter);
+  if (q) rows = rows.filter(b =>
+    (b.name || '').toLowerCase().includes(q) ||
+    (b.phone || '').toLowerCase().includes(q) ||
+    (b.payment_ref || '').toLowerCase().includes(q));
+  rows.sort((a, b) => (ORDER[a.status] ?? 5) - (ORDER[b.status] ?? 5) || a.id - b.id);
+
+  empty.style.display = rows.length ? 'none' : '';
   if (!rows.length) {
-    empty.textContent = 'Aucune pré-réservation pour le moment.';
+    empty.innerHTML = DATA.length
+      ? '<strong>Aucun résultat</strong>' + (q ? 'Aucune réservation ne correspond à « ' + esc(query) + ' ».' : 'Aucune réservation dans ce statut pour le moment.')
+      : '<strong>Aucune pré-réservation.</strong> Les demandes WhatsApp et Telegram arriveront ici automatiquement.';
+    tbody.innerHTML = '';
     return;
   }
-  empty.style.display = 'none';
-  tbody.innerHTML = rows.map(b => `
-    <tr>
-      <td>${b.id}</td>
-      <td><b>${b.name || '—'}</b></td>
-      <td><span class="channel">${b.channel}</span></td>
-      <td>${b.check_in || '—'}</td>
-      <td>${b.check_out || '—'}</td>
-      <td>${b.room_type || '—'}</td>
-      <td>${b.phone || '—'}</td>
-      <td><span class="status ${b.status}">${STATUS[b.status] || b.status}</span></td>
+
+  tbody.innerHTML = rows.map(b => {
+    let pay = '<span class="pay"><span class="due">—</span></span>';
+    if (b.amount_due) {
+      if (b.status === 'paid') {
+        pay = `<span class="pay"><span class="ok">${money(b.amount_paid || b.amount_due)}<span class="ref" title="Transaction">${b.payment_ref ? esc(b.payment_ref.slice(0, 16)) : '—'}</span></span></span>`;
+      } else if (b.status === 'awaiting_payment') {
+        pay = `<span class="pay"><span class="wait">${money(b.amount_due)}<span class="ref" title="Transaction">${b.payment_ref ? esc(b.payment_ref.slice(0, 16)) : 'lien envoyé'}</span></span></span>`;
+      } else {
+        pay = `<span class="pay"><span class="due">${money(b.amount_due)}` + (b.amount_paid ? `<span class="ok"> · reçu ${money(b.amount_paid)}</span>` : '') + `</span></span>`;
+      }
+    }
+    const stay = b.check_out ? `${esc(b.check_in)} → ${esc(b.check_out)}` : esc(b.check_in || '—');
+    return `<tr data-status="${b.status}">
+      <td class="mono">${b.id}</td>
+      <td class="guest"><b>${esc(b.name || '—')}</b><span class="channel">${esc(b.channel || '')}</span></td>
+      <td class="stay">${stay}</td>
+      <td class="room">${esc(b.room_type || '—')}</td>
+      <td>${b.phone ? `<a class="tel mono" href="tel:${esc(b.phone)}">${esc(b.phone)}</a>` : '—'}</td>
+      <td>${pay}</td>
+      <td><span class="status ${b.status}">${STATUS[b.status] || esc(b.status)}</span></td>
       <td>
-        <select onchange="setStatus(${b.id}, this.value)">
-          ${Object.entries(STATUS).map(([k, v]) =>
-            `<option value="${k}" ${k === b.status ? 'selected' : ''}>${v}</option>`).join('')}
+        <select onchange="setStatus(${b.id}, this.value)" aria-label="Changer le statut de la réservation ${b.id}">
+          ${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === b.status ? 'selected' : ''}>${v}</option>`).join('')}
         </select>
       </td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
+}
+
+function render() {
+  renderFilters();
+  renderTable();
 }
 
 async function setStatus(id, status) {
@@ -116,19 +267,27 @@ async function setStatus(id, status) {
   refresh();
 }
 
+function applySearch() {
+  query = $('q').value;
+  renderTable();
+}
+
 async function refresh() {
   try {
     const [stats, prebooks] = await Promise.all([
       fetch('/api/stats').then(r => r.json()),
       fetch('/api/prebookings').then(r => r.json()),
     ]);
-    renderCards(stats);
-    renderPrebookings(prebooks);
+    DATA = prebooks;
+    renderCounts(stats);
+    render();
   } catch (e) {
-    document.getElementById('empty').textContent = 'Erreur de chargement ' + e;
+    $('empty').style.display = '';
+    $('empty').innerHTML = '<strong>Chargement impossible</strong>Le serveur ne répond pas. Vérifiez que l\'API tourne, puis réessayez.<br><button class="retry" onclick="refresh()">Réessayer</button>';
   }
 }
 
+$('q').addEventListener('input', applySearch);
 refresh();
 setInterval(refresh, 30000);
 </script>

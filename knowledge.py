@@ -1,7 +1,11 @@
 POPAIX_KNOWLEDGE = {
-    "hotel": "Hôtel Pôpaix - 23 chambres face plage/lagune Koyiri/Fresco, Côte d'Ivoire",
-    "reouverture": "15 décembre 2026 à 16h - Piscine nouvelle installation",
-    "statut": "Fermé pour rénovation, pré-réservations ouvertes",
+    "nom": "PO PAIX HOTEL ET EXPERIENCES",
+    "hotel": (
+        "PO PAIX HOTEL ET EXPERIENCES - 23 chambres climatisées face plage/lagune "
+        "Koyiri/Fresco (Gbôkle, Bas-Sassandra), Côte d'Ivoire"
+    ),
+    "ouverture": "Ouvert dès aujourd'hui - aucune restriction de date",
+    "statut": "Ouvert - Réservations ouvertes dès aujourd'hui, aucune restriction",
     "chambres": {
         "T1": {"label": "T1 - Chambre standard", "prix": "25.000 FCFA/nuit"},
         "T2": {"label": "T2 - Chambre supérieure", "prix": "30.000 FCFA/nuit"},
@@ -23,12 +27,12 @@ POPAIX_KNOWLEDGE = {
         "Restaurant ANWUKWA : Sorbets 2.000 F, Pizza Margherita 4.000 F + boisson, "
         "Royale 5.000 F + boisson, Cuisine africaine/caribéenne/française halal"
     ),
-    "contact": "01 42 30 84 84 / @hotelpopaix",
+    "contact": "+225 0702391982 / @hotelpopaix https://x.com/HotelPopaix?lang=en",
     "paiement": "Espèces, Wave, Orange Money, MTN Money",
     "localisation": "Face plage/lagune Koyiri - Fresco, Côte d'Ivoire",
     "canal_presentation": (
-        "Plus d'infos disponibles sur WhatsApp et Telegram. "
-        "Posez vos questions : tarifs, chambres, réouverture."
+        "PO PAIX HOTEL ET EXPERIENCES OUVERT — 23 chambres face plage à Fresco. "
+        "Découvrez les chambres T1-T4, le restaurant ANWUKWA et tous nos services."
     ),
     "tiket": {
         "source": "https://www.tiket.com/en-us/hotel/cote-divoire/hotel-popaix-707001721942024071",
