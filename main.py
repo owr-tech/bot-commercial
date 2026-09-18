@@ -2,7 +2,7 @@ import os
 import threading
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -85,7 +85,11 @@ def send_telegram_text(chat_id: str, text: str):
 
 # ---------------------------------------------------------------- WhatsApp
 @app.get("/webhook")
-def verify_webhook(mode: str = "", token: str = "", challenge: str = ""):
+def verify_webhook(
+    mode: str = Query("", alias="hub.mode"),
+    token: str = Query("", alias="hub.verify_token"),
+    challenge: str = Query("", alias="hub.challenge"),
+):
     if mode == "subscribe" and token == VERIFY_TOKEN:
         return challenge
     raise HTTPException(status_code=403, detail="Verification failed")
