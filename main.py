@@ -91,7 +91,7 @@ def verify_webhook(
     challenge: str = Query("", alias="hub.challenge"),
 ):
     if mode == "subscribe" and token == VERIFY_TOKEN:
-        return challenge
+        return Response(challenge, media_type="text/plain")
     raise HTTPException(status_code=403, detail="Verification failed")
 
 
