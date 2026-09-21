@@ -178,7 +178,33 @@ def _validate_date_range(
     in_day, in_month = _split_date(check_in)
     out_day, out_month = _split_date(check_out)
     resolved_in = _resolve_date(in_day, in_month) if in_day and in_month else None
-    resolved_out = _resolve_date(out_day, out_month) if out_day and out_month else None
+
+    # Le départ est résolu dans le même repère que l'arrivée (pas indépendamment
+    # d'aujourd'hui) : sinon un départ « passé » dans le même mois glisse à l'année
+    # suivante et échappe à la vérification « départ après arrivée ».
+    resolved_out = None
+    if out_day and out_month and resolved_in:
+        same_year = None
+        try:
+            same_year = date(resolved_in.year, out_month, out_day)
+        except ValueError:
+            same_year = None
+        if out_month == in_month:
+            if same_year is not None:
+                resolved_out = same_year  # départ avant/pour l'arrivée → refusé plus bas
+            else:
+                resolved_out = None
+        elif same_year is not None and same_year > resolved_in:
+            resolved_out = same_year
+        else:
+            # Mois de départ avant le mois d'arrivée → séjour chevauchant l'année
+            try:
+                resolved_out = date(resolved_in.year + 1, out_month, out_day)
+            except ValueError:
+                resolved_out = None
+    elif out_day and out_month:
+        resolved_out = _resolve_date(out_day, out_month)
+
     max_d = _booking_max_date()
     if resolved_in and resolved_in > max_d:
         return (
@@ -333,6 +359,7 @@ def validate_check_in_date(raw_text: str, check_in: str | None) -> str | None:
                 return _past_date_message()
         except ValueError:
             return None
+        return None  # année explicite future → séjour lointain OK
 
     # Mois courant → même année, le jour doit être aujourd'hui ou plus tard
     if month == today.month:

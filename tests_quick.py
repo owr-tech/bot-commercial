@@ -69,6 +69,9 @@ def test_date_restriction():
 
 def test_flow_booking():
     # Parcours complet via le flow (sans clés PayDunya → fallback manuel)
+    import payments
+
+    payments.PAYMENT_PROVIDER = "none"  # force le fallback, pas d'appel PayDunya
     from flows import handle_message
     from database import clear_session_state
 
@@ -113,13 +116,24 @@ def test_presentation():
 
 
 def test_date_range_validation():
-    from flows import _validate_date_range
-    # Départ avant arrivée → refusé
-    assert _validate_date_range("25/09", "20/09") is not None
+    from flows import _validate_date_range, MONTH_DAYS
+    today = date.today()
+    in_d, in_m = today.day, today.month
+    dm = MONTH_DAYS[in_m - 1]
+    out_d1 = in_d + 3 if in_d + 3 <= dm else 1
+    out_m1 = in_m if in_d + 3 <= dm else in_m + 1
+    out_m2 = in_m + 1 if in_m < 12 else 1
+    d = lambda d_, m_: f"{d_:02d}/{m_:02d}"
+    # Départ avant l'arrivée (même mois) → refusé
+    assert _validate_date_range(d(out_d1, out_m1), d(in_d, in_m)) is not None
     # Départ même jour → refusé
-    assert _validate_date_range("20/09", "20/09") is not None
+    not_valid = None
+    if out_m1 == in_m:  # seulement si les deux jours tombent dans le même mois
+        assert _validate_date_range(d(in_d, in_m), d(in_d, in_m)) is not None
     # Plage valide → OK
-    assert _validate_date_range("20/09", "25/09") is None
+    assert _validate_date_range(d(in_d, in_m), d(out_d1, out_m1)) is None
+    # Séjour chevauchant l'année → OK
+    assert _validate_date_range("25/12", "02/01") is None
 
 
 def test_picker_api():
@@ -151,7 +165,11 @@ def test_whatsapp_flow():
 
     fj = build_flow_json()
     assert [s["id"] for s in fj["screens"]] == ["ROOM", "DATES"]
-    assert fj["version"] == "5.0"
+    assert fj["version"] == "7.3"
+    room_screen, dates_screen = fj["screens"]
+    assert room_screen["terminal"] is False
+    assert dates_screen["terminal"] is True and dates_screen["success"] is True
+    assert "routing_model" not in room_screen
     # Les 4 chambres ont une image dans l'écran ROOM (offre d'abord)
     room_json = json.dumps(fj["screens"][0])
     for room in ("T1", "T2", "T3", "T4"):

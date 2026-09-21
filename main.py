@@ -48,8 +48,8 @@ WHATSAPP_PHONE_ID = (
     os.getenv("WHATSAPP_PHONE_ID") or os.getenv("PHONE_NUMBER_ID") or os.getenv("PHONE_ID") or ""
 )
 WABA_ID = os.getenv("WABA_ID", "")
-GRAPH_URL = f"https://graph.facebook.com/v19.0/{WHATSAPP_PHONE_ID}/messages"
-GRAPH_MEDIA_URL = f"https://graph.facebook.com/v19.0/{WHATSAPP_PHONE_ID}/media"
+GRAPH_URL = f"https://graph.facebook.com/v21.0/{WHATSAPP_PHONE_ID}/messages"
+GRAPH_MEDIA_URL = f"https://graph.facebook.com/v21.0/{WHATSAPP_PHONE_ID}/media"
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN", "")
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "http://localhost:8000").rstrip("/")
 

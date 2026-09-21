@@ -1,7 +1,7 @@
 """WhatsApp Business Flows — composant natif (rendu du composant OpenUI
 `DateRangePicker` + `RoomCard` sur WhatsApp).
 
-Écrans Flow (version 5.0) :
+Écrans Flow (version 7.3) :
     DATES  →  deux DatePicker (arrivée / départ, min/max YYYY-MM-DD)
     ROOM   →  images + Dropdown des chambres T1-T4
 Puis `complete` renvoie {checkin, checkout, room} au bot.
@@ -20,7 +20,7 @@ import requests
 
 from rooms import ROOM_INFO
 
-FLOW_VERSION = "5.0"
+FLOW_VERSION = "7.3"
 FLOW_NAME = os.getenv("WA_FLOW_NAME", "popaix_dates")
 FLOW_ID = os.getenv("WA_FLOW_ID", "").strip()
 GRAPH = "https://graph.facebook.com/v21.0"
@@ -65,7 +65,7 @@ def build_flow_json(
     max_date: Optional[str] = None,
     single_screen: bool = False,
 ) -> dict:
-    """Construit le JSON du Flow WhatsApp (v5.0, 2 écrans ou 1 écran)."""
+    """Construit le JSON du Flow WhatsApp (v7.3, 2 écrans ou 1 écran)."""
     min_date = min_date or booking_window()[0]
     max_date = max_date or booking_window()[1]
 
@@ -76,8 +76,8 @@ def build_flow_json(
                 {
                     "id": "BOOKING",
                     "title": "Pré-réservation",
-                    "terminal": "true",
-                    "success": "true",
+                    "terminal": True,
+                    "success": True,
                     "data": {},
                     "layout": {
                         "type": "SingleColumnLayout",
@@ -144,9 +144,8 @@ def build_flow_json(
             {
                 "id": "ROOM",
                 "title": "Votre chambre",
-                "terminal": "false",
+                "terminal": False,
                 "data": {},
-                "routing_model": {"ROOM": ["DATES"]},
                 "layout": {
                     "type": "SingleColumnLayout",
                     "children": [
@@ -183,8 +182,8 @@ def build_flow_json(
             {
                 "id": "DATES",
                 "title": "Vos dates",
-                "terminal": "true",
-                "success": "true",
+                "terminal": True,
+                "success": True,
                 "data": {
                     "room": {"type": "string", "__example__": "T2"},
                 },
